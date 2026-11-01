@@ -1,0 +1,10 @@
+# Dépendances et compilation
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+src/fonts/
+
+# Système
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PhotoPi</title>
+  <link rel="stylesheet" href="fonts/manrope.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-logo" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="15.5" cy="8.5" r="1.8"/><path d="m3 17 5.5-6 4 4.5 2-2L21 19"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></symbol>
+    <symbol id="i-film" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 4v16M17 4v16M2 9h5M2 15h5M17 9h5M17 15h5"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol>
+    <symbol id="i-live" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="6.5" stroke-dasharray="2 2.2"/><circle cx="12" cy="12" r="10"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-square" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M8 16H3v5"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.9-.9"/></symbol>
+    <symbol id="i-album" viewBox="0 0 24 24"><path d="M6 4h12M4 7.5h16"/><rect x="3" y="11" width="18" height="10" rx="2"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.7 18-8-14a2 2 0 0 0-3.5 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3z"/><path d="M12 9v4M12 17h.01"/></symbol>
+  </svg>
+
+  <div class="app">
+    <header class="topbar" data-tauri-drag-region>
+      <div class="brand" data-tauri-drag-region><svg><use href="#i-logo"/></svg><span>PhotoPi</span></div>
+      <div class="crumb" id="crumb" data-tauri-drag-region></div>
+      <div class="spacer" data-tauri-drag-region></div>
+      <div class="filters top-filters" id="media-filter" role="group" aria-label="Afficher">
+        <button data-f="all" class="active">Tout</button>
+        <button data-f="photos">Photos</button>
+        <button data-f="videos">Vidéos</button>
+        <button data-f="secret" title="Seulement les photos secrètes (mot de passe)"><svg><use href="#i-lock"/></svg>Secrètes</button>
+      </div>
+      <label class="zoom" title="Taille des miniatures">
+        <svg><use href="#i-image"/></svg>
+        <input id="tile" type="range" min="110" max="320" step="10" value="180" aria-label="Taille des miniatures">
+      </label>
+      <button class="icon-btn" id="btn-rescan" title="Relire la photothèque" aria-label="Relire la photothèque"><svg><use href="#i-refresh"/></svg></button>
+      <button class="icon-btn" id="btn-settings" title="Paramètres" aria-label="Paramètres"><svg><use href="#i-settings"/></svg></button>
+      <div class="win-ctrl">
+        <button id="win-min" title="Réduire" aria-label="Réduire"><svg><use href="#i-minus"/></svg></button>
+        <button id="win-max" title="Agrandir" aria-label="Agrandir"><svg><use href="#i-square"/></svg></button>
+        <button id="win-close" class="close" title="Fermer" aria-label="Fermer"><svg><use href="#i-x"/></svg></button>
+      </div>
+    </header>
+
+    <div class="main">
+      <nav class="sidebar" id="sidebar" aria-label="Chronologie"></nav>
+      <section class="content" id="content" tabindex="-1"><div id="screen"></div></section>
+      <div class="scrubber" id="scrubber" hidden aria-hidden="true">
+        <div class="scrub-years" id="scrub-years"></div>
+        <div class="scrub-mark" id="scrub-mark"></div>
+        <div class="scrub-bubble" id="scrub-bubble" hidden></div>
+      </div>
+    </div>
+    <div class="pregen" id="pregen" hidden>
+      <span id="pregen-text"></span>
+      <div class="bar"><i id="pregen-bar"></i></div>
+    </div>
+
+    <div class="panel" id="settings" hidden>
+      <h3>Paramètres</h3>
+      <div class="field">
+        <span class="label">Dossier de la photothèque</span>
+        <div class="path-row"><code id="set-library">Aucun</code><button class="btn" id="set-library-btn">Changer</button></div>
+      </div>
+      <div class="field">
+        <span class="label">Dossier des rapports du script de tri</span>
+        <div class="path-row"><code id="set-reports">Aucun</code><button class="btn" id="set-reports-btn">Changer</button></div>
+        <p class="hint">Les fichiers rapport_tri_….csv servent à retrouver l'exemplaire conservé de chaque doublon.</p>
+      </div>
+      <div class="field">
+        <span class="label">Photos similaires</span>
+        <p class="hint">Compare les photos qui se ressemblent (copies redimensionnées, retouchées, rafales). Pour chaque paire, tu choisis laquelle garder, ou tu indiques qu'elles sont différentes.</p>
+        <button class="btn" id="set-similar-btn" style="margin-top:8px">Comparer les photos similaires</button>
+      </div>
+      <div class="field">
+        <span class="label">Photos secrètes</span>
+        <label class="switch-row" for="set-secret">
+          <span class="switch-text"><svg><use href="#i-lock"/></svg><span id="set-lock">…</span></span>
+          <input type="checkbox" role="switch" class="switch" id="set-secret" aria-label="Afficher les photos secrètes">
+        </label>
+        <p class="hint">Masquées à chaque démarrage. Pour rendre une photo secrète : touche L dans la visionneuse, ou « Rendre secret » au survol du titre d'un album. Les fichiers ne sont pas modifiés et restent visibles dans l'explorateur Windows.</p>
+        <button class="link-btn" id="set-lock-btn">Mot de passe</button>
+      </div>
+      <div class="field">
+        <span class="label">Miniatures en cache</span>
+        <div class="path-row"><span id="set-cache">…</span><button class="btn" id="set-cache-btn">Vider</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barre d'actions de la sélection -->
+  <div class="selbar" id="selbar" role="toolbar" aria-label="Sélection" hidden>
+    <span id="sel-count"></span>
+    <button class="btn icon-text" id="sel-album"><svg><use href="#i-album"/></svg><span>Ajouter à un album</span></button>
+    <button class="btn icon-text" id="sel-unalbum" hidden><svg><use href="#i-x"/></svg><span>Retirer de l'album</span></button>
+    <button class="btn icon-text" id="sel-lock"><svg><use href="#i-lock"/></svg><span>Rendre secrètes</span></button>
+    <button class="btn icon-text" id="sel-unlock"><svg><use href="#i-unlock"/></svg><span>Retirer des secrètes</span></button>
+    <button class="btn icon-text danger" id="sel-trash"><svg><use href="#i-trash"/></svg><span>Corbeille</span></button>
+    <button class="sel-close" id="sel-clear" title="Tout désélectionner (Échap)" aria-label="Tout désélectionner"><svg><use href="#i-x"/></svg></button>
+  </div>
+
+  <!-- Visionneuse plein écran -->
+  <div class="viewer" id="viewer" hidden>
+    <div class="v-top">
+      <div class="v-title"><strong id="v-date"></strong><span id="v-name"></span></div>
+      <div class="v-actions">
+        <button class="v-btn" id="v-live" title="Lire la photo animée (Espace)" hidden><svg><use href="#i-live"/></svg></button>
+        <button class="v-btn" id="v-album" title="Ajouter à un album"><svg><use href="#i-album"/></svg></button>
+        <button class="v-btn" id="v-lock" title="Rendre secrète (L)"><svg><use href="#i-lock"/></svg></button>
+        <button class="v-btn" id="v-folder" title="Afficher dans l'explorateur"><svg><use href="#i-folder"/></svg></button>
+        <button class="v-btn" id="v-info-btn" title="Informations (I)"><svg><use href="#i-info"/></svg></button>
+        <button class="v-btn" id="v-trash" title="Mettre à la corbeille (Suppr)"><svg><use href="#i-trash"/></svg></button>
+        <button class="v-btn" id="v-close" title="Fermer (Échap)"><svg><use href="#i-x"/></svg></button>
+      </div>
+    </div>
+    <div class="v-body">
+      <div class="v-stage" id="v-stage">
+        <img id="v-img" alt="" draggable="false">
+        <video id="v-video" controls playsinline hidden></video>
+        <video id="v-motion" muted playsinline hidden></video>
+        <div class="v-msg" id="v-msg" hidden></div>
+        <div class="v-zoom" id="v-zoom" hidden></div>
+      </div>
+      <aside class="v-info" id="v-info" hidden></aside>
+      <button class="v-nav prev" id="v-prev" aria-label="Précédente"><svg><use href="#i-left"/></svg></button>
+      <button class="v-nav next" id="v-next" aria-label="Suivante"><svg><use href="#i-right"/></svg></button>
+    </div>
+  </div>
+
+  <!-- Boîte de confirmation -->
+  <div class="modal" id="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h3 id="modal-title"></h3>
+      <p id="modal-text"></p>
+      <div class="modal-actions">
+        <button class="btn" id="modal-cancel">Annuler</button>
+        <button class="btn danger" id="modal-ok">Mettre à la corbeille</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Choix d'un album -->
+  <div class="modal" id="pick-modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pick-title">
+      <h3 id="pick-title">Ajouter à un album</h3>
+      <div class="pick-list" id="pick-list"></div>
+      <div class="modal-actions"><button class="btn" id="pick-cancel">Annuler</button></div>
+    </div>
+  </div>
+
+  <!-- Saisie de mot de passe -->
+  <div class="modal" id="pw-modal" hidden>
+    <form class="modal-card" id="pw-form" role="dialog" aria-modal="true" aria-labelledby="pw-title" autocomplete="off">
+      <h3 id="pw-title"></h3>
+      <p id="pw-text"></p>
+      <div id="pw-fields"></div>
+      <div class="pw-error" id="pw-error" role="alert"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="pw-cancel">Annuler</button>
+        <button type="submit" class="btn primary" id="pw-ok">Valider</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="main.js"></script>
+</body>
+</html>
