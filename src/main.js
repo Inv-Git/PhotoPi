@@ -135,8 +135,11 @@ async function loadLibrary() {
   for (const al of lib.others) for (const it of al.items) it.private = !!it.locked;
   countThumbs();
   startPregen();
+  refreshImportInfo();
   renderSidebar();
   if (view && view.type === "dupes") return showDupes();
+  if (view && view.type === "import") return showImport();
+  if (view && view.type === "explore") return showExplore();
   if (view && view.type === "album" && findAlbum(view.id)) return showAlbum(view.id);
   if (view && view.type === "year" && lib.years.some((y) => y.year === view.year)) return showYear(view.year);
   if (lib.years.length) {
@@ -190,6 +193,7 @@ async function setFilter(f) {
   if (view && view.type === "year") showYear(view.year);
   else if (view && view.type === "album") showAlbum(view.id);
   else if (view && view.type === "talbum") showThemeAlbum(view.id);
+  else if (view && view.type === "explore") showExplore();
   else renderSidebar();
 }
 const albumLabel = (a) => (a.month && !a.event ? cap(fmtMonth(a.month)) : a.title);
@@ -265,6 +269,17 @@ function renderSidebar() {
     sb.append(b);
   }
   sb.append(el("h4", null, "Outils"));
+  const imp = el("button", "nav-item dupes");
+  if (view && view.type === "import") imp.classList.add("active");
+  imp.append(icon("import"), el("span", "label", "Importer des photos"));
+  if (importInfo.pending) imp.append(el("span", "count", nf.format(importInfo.pending)));
+  imp.onclick = showImport;
+  sb.append(imp);
+  const ex = el("button", "nav-item");
+  if (view && view.type === "explore") ex.classList.add("active");
+  ex.append(icon("folder"), el("span", "label", "Explorer un dossier"));
+  ex.onclick = showExplore;
+  sb.append(ex);
   const d = el("button", "nav-item dupes");
   if (view && view.type === "dupes") d.classList.add("active");
   d.append(icon("layers"), el("span", "label", "Doublons à vérifier"));
@@ -477,7 +492,7 @@ function startPregen(first = []) {
   const seen = new Set();
   const paths = [];
   const add = (it) => {
-    if (it.kind === "video" || it.private || it.thumb || seen.has(it.path)) return;
+    if (it.kind === "video" || it.private || it.explore || it.thumb || seen.has(it.path)) return;
     seen.add(it.path);
     paths.push(it.path);
   };
@@ -492,7 +507,7 @@ function startPregen(first = []) {
 /** La vue affichée passe en priorité (si des miniatures y manquent). */
 function prioritize(items) {
   clearTimeout(prioritize.timer);
-  if (!items.some((it) => it.kind !== "video" && !it.private && !it.thumb)) return;
+  if (!items.some((it) => it.kind !== "video" && !it.private && !it.explore && !it.thumb)) return;
   prioritize.timer = setTimeout(() => startPregen(items), 300);
 }
 
@@ -825,6 +840,7 @@ function rerender() {
   if (view.type === "year") showYear(view.year);
   else if (view.type === "album") showAlbum(view.id);
   else if (view.type === "talbum") showThemeAlbum(view.id);
+  else if (view.type === "explore") showExplore();
   $("content").scrollTop = scroll;
 }
 
@@ -941,6 +957,7 @@ function pickAlbum() {
 }
 
 async function addToAlbum(items) {
+  if (items.some((it) => it.explore)) return;
   if (!items.length) return;
   const al = await pickAlbum();
   if (!al) return;
@@ -1094,12 +1111,18 @@ function syncSelection() {
   $("sel-lock").hidden = priv === items.length;
   $("sel-unlock").hidden = !priv;
   $("sel-unalbum").hidden = !(view && view.type === "talbum");
+  // explorateur : seulement l'ajout à la photothèque (copie), rien d'autre
+  const exploring = !!(view && view.type === "explore");
+  $("sel-import").hidden = !exploring;
+  if (exploring) for (const id of ["sel-date", "sel-album", "sel-unalbum", "sel-lock", "sel-unlock", "sel-trash"]) $(id).hidden = true;
+  else $("sel-date").hidden = $("sel-album").hidden = $("sel-trash").hidden = false;
   bar.hidden = false;
 }
 
 const filesOf = (items) => items.flatMap((it) => [it.path, it.raw, it.motion].filter(Boolean));
 
 async function trashSelection() {
+  if (view && view.type === "explore") return;
   const items = [...selected];
   if (!items.length) return;
   const files = filesOf(items);
@@ -1132,6 +1155,7 @@ async function trashSelection() {
 }
 
 async function lockSelection() {
+  if (view && view.type === "explore") return;
   const items = [...selected].filter((it) => !it.private);
   if (!items.length) return;
   if (!(await lockItems(items))) return;
@@ -1268,6 +1292,7 @@ async function showCurrent() {
     video.play().catch(() => {});
     return;
   }
+  for (const id of ["v-lock", "v-album", "v-trash"]) $(id).hidden = !!it.explore;
   $("v-lock").querySelector("use").setAttribute("href", it.private ? "#i-unlock" : "#i-lock");
   $("v-lock").title = it.private ? "Retirer des photos secrètes (L)" : "Rendre secrète (L)";
   stageMsg("loading");
@@ -1378,7 +1403,7 @@ function afterRemoval(message) {
 
 async function trashCurrent() {
   const it = shown[vIdx];
-  if (!it) return;
+  if (!it || it.explore) return;
   const files = [it.path, it.raw, it.motion].filter(Boolean);
   const list = files.map(baseName).join("\n");
   const ok = await confirmBox(
@@ -1890,6 +1915,7 @@ function askPassword({ title, text, fields, okLabel = "Valider", check }) {
       label.htmlFor = id;
       const input = el("input", "input");
       input.type = f.type || "password";
+      if (f.max) input.max = f.max;
       if (f.value) input.value = f.value;
       input.id = id;
       input.autocomplete = "off";
@@ -2009,7 +2035,7 @@ async function lockAlbum(a, shownItems = a.items) {
 
 async function toggleLock() {
   const it = shown[vIdx];
-  if (!it) return;
+  if (!it || it.explore) return;
   if (!it.private) {
     if (await lockItems([it])) afterRemoval("Photo rendue secrète");
     return;
@@ -2062,6 +2088,451 @@ async function hideSecrets() {
   fillSettings();
   await loadLibrary();
   toast("Photos secrètes masquées");
+}
+
+// ---------------------------------------------------------------------------
+// Import : dossier d'arrivée en vrac -> photothèque rangée par mois
+// ---------------------------------------------------------------------------
+
+let importInfo = { dir: "", pending: 0, exiftool: true };
+let importState = "idle"; // idle | analyzing | ready | applying
+let importSummary = null;
+let importSource = ""; // vide : dossier d'arrivée ; sinon : autre dossier, copié sans doublons
+
+const IMPORT_STEPS = {
+  extract: "Extraction des archives",
+  scan: "Inventaire du dossier",
+  dates: "Lecture des dates de prise de vue",
+  dups: "Recherche des doublons",
+  quasi: "Recherche des photos recompressées",
+  plan: "Préparation du rangement",
+  move: "Rangement des fichiers",
+  copy: "Copie des nouvelles photos",
+};
+
+async function refreshImportInfo() {
+  try {
+    importInfo = await invoke("import_info");
+  } catch (_) {}
+  renderSidebar();
+  if (view && view.type === "import" && importState === "idle") renderImport();
+}
+
+TAURI.event.listen("import", (e) => {
+  const { step, done, total } = e.payload;
+  const box = document.querySelector("#screen .progress-box");
+  if (!box) return;
+  box.querySelector(".text").textContent = (IMPORT_STEPS[step] || step) + (total ? ` : ${nf.format(done)} / ${nf.format(total)}` : "…");
+  const bar = box.querySelector(".bar-lg");
+  bar.classList.toggle("indeterminate", !total);
+  bar.querySelector("i").style.width = total ? ((done / total) * 100).toFixed(1) + "%" : "";
+});
+
+function showImport() {
+  view = { type: "import" };
+  renderSidebar();
+  $("crumb").textContent = "Importer des photos";
+  if (importState === "idle") refreshImportInfo();
+  renderImport();
+}
+
+function progressBox() {
+  const box = el("div", "progress-box");
+  box.append(el("div", "text", "Préparation…"));
+  const bar = el("div", "bar-lg indeterminate");
+  bar.append(el("i"));
+  box.append(bar);
+  return box;
+}
+
+function renderImport() {
+  if (!view || view.type !== "import") return;
+  const c = screen();
+  const wrap = el("div", "import");
+  wrap.append(el("h1", null, "Importer des photos"));
+  wrap.append(
+    el(
+      "p",
+      "lead",
+      "Dépose tes photos, vidéos, RAW ou archives Google Takeout en vrac dans le dossier d'arrivée. PhotoPi les range par mois dans ta photothèque, garde les dossiers bien nommés comme événements et met les doublons de côté. Rien n'est déplacé avant ta validation."
+    )
+  );
+
+  const card = el("div", "card");
+  card.append(el("span", "label", "Dossier d'arrivée"));
+  const row = el("div", "path-row");
+  const code = el("code", null, importInfo.dir || "Choisis d'abord ta photothèque");
+  code.title = importInfo.dir;
+  const open = el("button", "btn", "Ouvrir");
+  open.title = "Ouvrir le dossier dans l'explorateur pour y déposer des photos";
+  open.disabled = !importInfo.dir;
+  open.onclick = () => invoke("open_folder", { path: importInfo.dir });
+  const change = el("button", "btn", "Changer");
+  change.onclick = async () => {
+    const p = await invoke("pick_folder");
+    if (!p) return;
+    settings.import_dir = p;
+    saveSettings();
+    importState = "idle";
+    refreshImportInfo();
+  };
+  row.append(code, open, change);
+  card.append(row);
+  card.append(
+    el(
+      "p",
+      "hint",
+      importInfo.pending
+        ? `${plural(importInfo.pending, "élément en attente", "éléments en attente")} (photos, vidéos et archives).`
+        : "Le dossier est vide pour l'instant. Dépose-y des photos, puis clique sur Actualiser."
+    )
+  );
+  wrap.append(card);
+
+  if (!importInfo.exiftool) {
+    const n = el("div", "notice");
+    n.append(icon("alert"));
+    const t = el("div");
+    t.append(document.createTextNode("ExifTool n'est pas installé : les dates des vidéos ne pourront pas être lues (elles iront dans « À trier »). Pour l'installer, dans PowerShell : "));
+    t.append(el("code", null, "winget install -e --id OliverBetz.ExifTool"));
+    t.append(document.createTextNode(", puis relance PhotoPi."));
+    n.append(t);
+    wrap.append(n);
+  }
+
+  const other = el("div", "card");
+  other.append(el("span", "label", "Importer depuis un autre dossier"));
+  other.append(
+    el(
+      "p",
+      "hint",
+      "Un ancien disque, une sauvegarde… PhotoPi copie seulement les photos et vidéos qui ne sont pas déjà dans ta photothèque. Le dossier choisi n'est jamais modifié."
+    )
+  );
+  const pick = el("button", "btn", importSource ? "Choisir un autre dossier" : "Choisir un dossier…");
+  pick.disabled = importState === "analyzing" || importState === "applying";
+  pick.onclick = async () => {
+    const p = await invoke("pick_folder");
+    if (!p) return;
+    importSource = p;
+    analyzeImport();
+  };
+  const otherActions = el("div", "actions");
+  otherActions.append(pick);
+  if (importSource) otherActions.append(el("code", "src-path", importSource));
+  other.append(otherActions);
+  wrap.append(other);
+
+  const zone = el("div", "card");
+  if (importSource && importState !== "idle") zone.append(el("span", "label", "Copie depuis " + importSource));
+  else if (importState !== "idle") zone.append(el("span", "label", "Dossier d'arrivée"));
+  if (importState === "analyzing" || importState === "applying") {
+    zone.append(progressBox());
+  } else if (importState === "ready" && importSummary) {
+    renderImportSummary(zone, importSummary);
+  } else {
+    const actions = el("div", "actions");
+    const go = el("button", "btn primary", "Analyser");
+    go.disabled = !importInfo.pending;
+    go.onclick = analyzeImport;
+    const refresh = el("button", "btn", "Actualiser");
+    refresh.onclick = refreshImportInfo;
+    actions.append(go, refresh);
+    zone.append(actions);
+  }
+  wrap.append(zone);
+  c.append(wrap);
+}
+
+function renderImportSummary(zone, s) {
+  const toMove = s.sorted + s.in_events + s.unsorted;
+  if (!s.files) {
+    zone.append(el("p", null, "Aucune photo ni vidéo trouvée dans le dossier d'arrivée."));
+  } else {
+    const stats = el("div", "stats");
+    const stat = (n, label, warn) => {
+      const d = el("div", "stat" + (warn && n ? " warn" : ""));
+      d.append(el("b", null, nf.format(n)), el("span", null, label));
+      stats.append(d);
+    };
+    stat(s.sorted, "rangés par mois");
+    stat(s.in_events, "dans des événements");
+    stat(s.unsorted, "sans date (« À trier »)", true);
+    stat(s.dups, importSource ? "déjà dans ta photothèque" : "doublons identiques");
+    stat(s.quasi, importSource ? "déjà présentes, recompressées" : "doublons recompressés");
+    stat(s.ignored, "autres fichiers, laissés en place");
+    zone.append(stats);
+    if (s.events.length) {
+      zone.append(el("span", "label", "Événements"));
+      const ul = el("ul", "ev-list");
+      for (const [m, name, n] of s.events) {
+        const li = el("li");
+        li.append(el("span", null, m ? cap(fmtMonth(m)) : "Sans date"), el("b", null, name), el("span", null, nf.format(n)));
+        ul.append(li);
+      }
+      zone.append(ul);
+    }
+    if (s.dups + s.quasi && !importSource) zone.append(el("p", "hint", "Les doublons iront dans « Doublons à vérifier » : rien n'est supprimé."));
+    if (s.dups + s.quasi && importSource) zone.append(el("p", "hint", "Les photos déjà présentes ne sont pas copiées."));
+  }
+  const actions = el("div", "actions");
+  if (s.files) {
+    const go = importSource
+      ? el("button", "btn primary", `Copier ${plural(toMove, "nouvel élément", "nouveaux éléments")}`)
+      : el("button", "btn primary", `Ranger ${plural(s.files, "élément", "éléments")}`);
+    go.disabled = importSource ? !toMove : false;
+    go.title = `${nf.format(toMove)} dans la photothèque, ${nf.format(s.dups + s.quasi)} dans les doublons à vérifier`;
+    go.onclick = applyImport;
+    actions.append(go);
+  }
+  const cancel = el("button", "btn", "Annuler");
+  cancel.onclick = () => {
+    importState = "idle";
+    importSummary = null;
+    importSource = "";
+    renderImport();
+  };
+  actions.append(cancel);
+  zone.append(actions);
+}
+
+async function analyzeImport() {
+  importState = "analyzing";
+  renderImport();
+  try {
+    importSummary = await invoke("import_analyze", { source: importSource || null });
+    importState = "ready";
+  } catch (e) {
+    importState = "idle";
+    toast(String(e));
+  }
+  renderImport();
+}
+
+async function applyImport() {
+  importState = "applying";
+  renderImport();
+  let res = null;
+  try {
+    res = await invoke("import_apply");
+  } catch (e) {
+    toast(String(e));
+  }
+  const copied = !!importSource;
+  importState = "idle";
+  importSummary = null;
+  importSource = "";
+  if (!res) return renderImport();
+  const msg =
+    `${plural(res.moved, copied ? "élément copié" : "élément rangé", copied ? "éléments copiés" : "éléments rangés")}` +
+    (res.skipped ? `, ${nf.format(res.skipped)} ignorés (déjà présents ou introuvables)` : "");
+  await loadLibrary();
+  toast(msg);
+}
+
+// ---------------------------------------------------------------------------
+// Explorer un dossier ou un disque, en lecture seule
+// ---------------------------------------------------------------------------
+
+let exploreRoot = "";
+let exploreData = null; // [{ path, items }]
+let exploreBusy = false;
+let exploreSmall = false; // afficher les images de moins de 20 ko
+const SMALL = 20 * 1024;
+try {
+  exploreRoot = localStorage.getItem("photopi.explorer") || "";
+  exploreSmall = localStorage.getItem("photopi.explorer.petites") === "1";
+} catch (_) {}
+
+TAURI.event.listen("explore", (e) => {
+  const box = document.querySelector("#screen .progress-box");
+  if (!box || !exploreBusy) return;
+  const { seen, found } = e.payload;
+  box.querySelector(".text").textContent = `${plural(seen, "fichier parcouru", "fichiers parcourus")}, ${plural(found, "photo ou vidéo trouvée", "photos ou vidéos trouvées")}…`;
+});
+
+async function chooseExploreRoot() {
+  const p = await invoke("pick_folder");
+  if (!p) return;
+  exploreRoot = p;
+  try {
+    localStorage.setItem("photopi.explorer", p);
+  } catch (_) {}
+  exploreData = null;
+  scanExplore();
+}
+
+function dropExploreViews() {
+  for (const [k, v] of [...views]) {
+    if (k.startsWith("x|")) {
+      if (k === current) current = null;
+      v.div.remove();
+      views.delete(k);
+    }
+  }
+}
+
+async function scanExplore() {
+  if (!exploreRoot) return showExplore();
+  view = { type: "explore" };
+  exploreBusy = true;
+  dropExploreViews();
+  renderSidebar();
+  $("crumb").textContent = "Explorer un dossier";
+  const c = screen();
+  const wrap = el("div", "import");
+  wrap.append(el("h1", null, "Explorer un dossier"));
+  wrap.append(el("p", "lead", exploreRoot));
+  const card = el("div", "card");
+  card.append(progressBox());
+  wrap.append(card);
+  c.append(wrap);
+  try {
+    const folders = await invoke("explore_scan", { path: exploreRoot });
+    for (const f of folders) for (const it of f.items) it.explore = true;
+    exploreData = folders;
+  } catch (e) {
+    exploreData = null;
+    toast(String(e));
+  }
+  exploreBusy = false;
+  if (view && view.type === "explore") showExplore();
+}
+
+/** Dater à la main : la sélection est déplacée dans le dossier du mois choisi. */
+async function dateSelection() {
+  const items = [...selected];
+  if (!items.length || (view && view.type === "explore")) return;
+  const files = (it) => [it.path, it.raw, it.motion].filter(Boolean);
+  const guess = items.map((it) => it.date).filter(Boolean).sort()[0];
+  const now = new Date();
+  const max = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const v = await askPassword({
+    title: items.length > 1 ? `Dater ${nf.format(items.length)} éléments` : "Dater cet élément",
+    text: "Choisis le mois de prise de vue. Les fichiers seront déplacés dans le dossier de ce mois ; ils ne sont pas modifiés.",
+    fields: [{ label: "Mois", type: "month", value: guess ? guess.slice(0, 7) : "", max }],
+    okLabel: "Ranger dans ce mois",
+    check: ([m]) => (/^\d{4}-\d{2}$/.test(m) ? null : "Choisis un mois."),
+  });
+  if (!v) return;
+  const month = v[0];
+  let moved;
+  try {
+    moved = await invoke("date_items", { groups: items.map(files), month });
+  } catch (e) {
+    return toast(String(e));
+  }
+  // les albums suivent les photos déplacées
+  const map = new Map(moved);
+  let changed = false;
+  for (const al of albums) {
+    al.paths = al.paths.map((p) => {
+      if (!map.has(p)) return p;
+      changed = true;
+      return map.get(p);
+    });
+  }
+  if (changed) saveAlbums();
+  clearSelection();
+  const n = items.filter((it) => map.has(it.path)).length;
+  await loadLibrary();
+  toast(`${plural(n, "élément rangé", "éléments rangés")} en ${fmtMonth(month)}`);
+}
+
+/** Copie la sélection dans le dossier d'arrivée, puis lance l'analyse d'import. */
+async function copySelectionToLibrary() {
+  const items = [...selected];
+  if (!items.length) return;
+  const bar = $("sel-import");
+  bar.disabled = true;
+  let n = 0;
+  try {
+    n = await invoke("explore_copy", { paths: items.map((it) => it.path) });
+  } catch (e) {
+    bar.disabled = false;
+    return toast("Copie impossible : " + e);
+  }
+  bar.disabled = false;
+  clearSelection();
+  toast(n ? `${plural(n, "fichier copié", "fichiers copiés")} : vérifie le résumé, puis « Ranger »` : "Déjà copiés dans le dossier d'arrivée");
+  importState = "idle";
+  importSummary = null;
+  importSource = "";
+  try {
+    importInfo = await invoke("import_info");
+  } catch (_) {}
+  showImport();
+  analyzeImport();
+}
+
+function showExplore() {
+  view = { type: "explore" };
+  renderSidebar();
+  $("crumb").textContent = "Explorer un dossier";
+  if (exploreBusy) return;
+  if (!exploreData) {
+    if (exploreRoot) return scanExplore();
+    const c = screen();
+    const wrap = el("div", "import");
+    wrap.append(el("h1", null, "Explorer un dossier"));
+    wrap.append(
+      el(
+        "p",
+        "lead",
+        "Choisis un dossier ou un disque entier : PhotoPi y cherche toutes les photos et vidéos, sous-dossiers compris, et les affiche par dossier. C'est en lecture seule : rien n'est déplacé, renommé ni ajouté à ta photothèque. Ta photothèque triée et les dossiers système ne sont pas parcourus."
+      )
+    );
+    const b = el("button", "btn primary", "Choisir un dossier ou un disque");
+    b.onclick = chooseExploreRoot;
+    wrap.append(b);
+    c.append(wrap);
+    return;
+  }
+  const rootName = exploreRoot.replace(/[\\/]+$/, "");
+  const rel = (p) => {
+    const r = p.slice(rootName.length).replace(/^[\\/]+/, "");
+    return r || rootName;
+  };
+  const keep = (it) => exploreSmall || it.kind === "video" || it.size >= SMALL;
+  const v = activate("x|" + exploreRoot + "|" + mediaFilter + "|" + (exploreSmall ? 1 : 0), (div, list) => {
+    div.classList.add("explore-view");
+    const folders = exploreData.map((f) => ({ f, items: visible(f.items.filter(keep)) })).filter((x) => x.items.length);
+    const total = folders.reduce((n, x) => n + x.items.length, 0);
+    const hidden = exploreData.reduce((n, f) => n + f.items.filter((it) => !keep(it)).length, 0);
+    const head = el("div", "explore-head");
+    head.append(el("h1", null, rootName));
+    const ro = el("span", "readonly");
+    ro.append(icon("lock"), el("span", null, "Lecture seule"));
+    head.append(ro, el("span", "sub", `${plural(total, "élément", "éléments")} dans ${plural(folders.length, "dossier", "dossiers")}`));
+    const small = el("button", "btn", exploreSmall ? "Masquer les petites images" : `Afficher les petites images (${nf.format(hidden)})`);
+    small.title = "Images de moins de 20 ko : icônes, vignettes de sites web…";
+    small.onclick = () => {
+      exploreSmall = !exploreSmall;
+      try {
+        localStorage.setItem("photopi.explorer.petites", exploreSmall ? "1" : "0");
+      } catch (_) {}
+      showExplore();
+    };
+    const again = el("button", "btn", "Relire");
+    again.onclick = () => {
+      exploreData = null;
+      scanExplore();
+    };
+    const change = el("button", "btn", "Changer de dossier");
+    change.onclick = chooseExploreRoot;
+    head.append(small, again, change);
+    div.append(head);
+    if (!total) {
+      div.append(el("p", "empty-filter", "Aucune photo ni vidéo à afficher ici."));
+      return;
+    }
+    for (const { f, items } of folders) {
+      const a = { id: f.path, title: rel(f.path), month: null, event: false, items };
+      div.append(sectionFor(a, list.length, true));
+      list.push(...items);
+    }
+  });
+  $("content").scrollTop = v.scroll;
 }
 
 // ---------------------------------------------------------------------------
@@ -2198,7 +2669,7 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     return;
   }
-  if (current && view && (view.type === "year" || view.type === "album" || view.type === "talbum") && !(e.target instanceof HTMLInputElement)) {
+  if (current && view && (view.type === "year" || view.type === "album" || view.type === "talbum" || view.type === "explore") && !(e.target instanceof HTMLInputElement)) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
       selectItems(shown);
       e.preventDefault();
@@ -2264,6 +2735,8 @@ document.addEventListener("keydown", (e) => {
     b.onclick = () => setFilter(b.dataset.f);
   }
   $("sel-album").onclick = () => addToAlbum([...selected]);
+  $("sel-import").onclick = copySelectionToLibrary;
+  $("sel-date").onclick = dateSelection;
   $("sel-unalbum").onclick = () => removeFromAlbum([...selected]);
   $("sel-lock").onclick = lockSelection;
   $("sel-unlock").onclick = unlockSelection;

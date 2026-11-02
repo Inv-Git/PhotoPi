@@ -1,6 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod dating;
 mod dupes;
+mod explore;
+mod importer;
 mod library;
 mod lock;
 mod media;
@@ -23,6 +26,8 @@ struct Settings {
     reports: String,
     /// Taille des miniatures dans la grille (px)
     tile: u32,
+    /// Dossier d'arrivée des photos à importer (vide : <photothèque>\Importation en cours)
+    import_dir: String,
 }
 
 struct AppState {
@@ -42,6 +47,8 @@ struct AppState {
     locked_items: Mutex<Vec<library::Item>>,
     /// Photos secrètes affichées (mot de passe donné depuis le démarrage)
     revealed: AtomicBool,
+    /// Dernière analyse d'import, en attente de validation
+    import_plan: Mutex<Option<importer::Plan>>,
 }
 
 fn read_json<T: serde::de::DeserializeOwned>(p: &Path) -> Option<T> {
@@ -477,6 +484,204 @@ fn albums_set(state: State<AppState>, albums: serde_json::Value) {
     save_json(&state.data_dir.join("albums.json"), &albums);
 }
 
+// ---------------------------------------------------------------------------
+// Import : ranger un dossier d'arrivée en vrac dans la photothèque
+// ---------------------------------------------------------------------------
+
+fn norm_path(p: &Path) -> String {
+    let mut k = util::norm(&p.to_string_lossy());
+    if !k.ends_with('\\') {
+        k.push('\\');
+    }
+    k
+}
+
+fn import_dir_of(s: &Settings) -> PathBuf {
+    if !s.import_dir.is_empty() {
+        PathBuf::from(&s.import_dir)
+    } else if !s.library.is_empty() {
+        Path::new(&s.library).join("Importation en cours")
+    } else {
+        PathBuf::new()
+    }
+}
+
+#[derive(serde::Serialize)]
+struct ImportInfo {
+    dir: String,
+    pending: usize,
+    exiftool: bool,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct ImportProgress {
+    step: String,
+    done: usize,
+    total: usize,
+}
+
+#[tauri::command]
+async fn import_info(app: AppHandle) -> Result<ImportInfo, String> {
+    let s = app.state::<AppState>().settings.lock().unwrap().clone();
+    let dir = import_dir_of(&s);
+    blocking(move || ImportInfo {
+        pending: if dir.as_os_str().is_empty() { 0 } else { importer::pending(&dir) },
+        exiftool: importer::find_exiftool().is_some(),
+        dir: dir.to_string_lossy().into_owned(),
+    })
+    .await
+}
+
+/// Analyse le dossier d'arrivée (sans rien déplacer) et garde le plan en attente de validation.
+#[tauri::command]
+async fn import_analyze(app: AppHandle, source: Option<String>) -> Result<importer::Summary, String> {
+    let s = app.state::<AppState>().settings.lock().unwrap().clone();
+    if s.library.is_empty() {
+        return Err("Choisis d'abord le dossier de ta photothèque.".into());
+    }
+    // sans source : le dossier d'arrivée (déplacement) ; avec : un autre dossier (copie des nouveautés)
+    let copy = source.as_deref().map_or(false, |p| !p.is_empty());
+    let src = if copy { PathBuf::from(source.unwrap_or_default()) } else { import_dir_of(&s) };
+    if !copy {
+        let _ = std::fs::create_dir_all(&src);
+    }
+    if copy && norm_path(&src).starts_with(&norm_path(Path::new(&s.library))) {
+        return Err("Ce dossier fait déjà partie de ta photothèque.".into());
+    }
+    blocking(move || {
+        let emit = |step: &str, done: usize, total: usize| {
+            let _ = app.emit("import", ImportProgress { step: step.to_string(), done, total });
+        };
+        let plan = importer::analyze(&src, Path::new(&s.library), copy, &emit)?;
+        let summary = plan.summary.clone();
+        *app.state::<AppState>().import_plan.lock().unwrap() = Some(plan);
+        Ok(summary)
+    })
+    .await?
+}
+
+/// Range pour de bon les fichiers de la dernière analyse.
+#[tauri::command]
+async fn import_apply(app: AppHandle) -> Result<importer::Applied, String> {
+    let s = app.state::<AppState>().settings.lock().unwrap().clone();
+    let reports = if s.reports.is_empty() { app.state::<AppState>().data_dir.clone() } else { PathBuf::from(&s.reports) };
+    blocking(move || {
+        let plan = app.state::<AppState>().import_plan.lock().unwrap().take();
+        let plan = plan.ok_or("Relance l'analyse avant de ranger.")?;
+        let emit = |step: &str, done: usize, total: usize| {
+            let _ = app.emit("import", ImportProgress { step: step.to_string(), done, total });
+        };
+        importer::apply(&plan, &reports, &emit)
+    })
+    .await?
+}
+
+/// Ouvre un dossier dans l'explorateur Windows (en le créant s'il n'existe pas).
+#[tauri::command]
+fn open_folder(path: String) {
+    let _ = std::fs::create_dir_all(&path);
+    #[cfg(windows)]
+    {
+        let _ = std::process::Command::new("explorer").arg(&path).spawn();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Explorer un dossier ou un disque, en lecture seule
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, serde::Serialize)]
+struct ExploreProgress {
+    seen: usize,
+    found: usize,
+}
+
+#[tauri::command]
+async fn explore_scan(app: AppHandle, path: String) -> Result<Vec<explore::Folder>, String> {
+    let s = app.state::<AppState>().settings.lock().unwrap().clone();
+    let cache = app.state::<AppState>().cache_dir.clone();
+    blocking(move || {
+        // la photothèque triée et le cache de PhotoPi ne sont pas explorés
+        let mut exclude = vec![cache.clone()];
+        if !s.library.is_empty() {
+            exclude.push(PathBuf::from(&s.library));
+        }
+        let emit = |seen: usize, found: usize| {
+            let _ = app.emit("explore", ExploreProgress { seen, found });
+        };
+        let mut folders = explore::scan(Path::new(&path), &exclude, &emit)?;
+        let dir = cache.join("miniatures");
+        for f in folders.iter_mut() {
+            for it in f.items.iter_mut().filter(|i| i.kind != "video") {
+                let t = media::thumb_file(Path::new(&it.path), &dir);
+                if t.exists() {
+                    it.thumb = Some(t.to_string_lossy().into_owned());
+                }
+            }
+        }
+        Ok(folders)
+    })
+    .await?
+}
+
+/// Copie des fichiers explorés dans le dossier d'arrivée, pour les ranger avec l'import.
+#[tauri::command]
+async fn explore_copy(app: AppHandle, paths: Vec<String>) -> Result<usize, String> {
+    let s = app.state::<AppState>().settings.lock().unwrap().clone();
+    if s.library.is_empty() {
+        return Err("Choisis d'abord le dossier de ta photothèque.".into());
+    }
+    let inbox = import_dir_of(&s);
+    blocking(move || explore::copy_to(&paths, &inbox)).await?
+}
+
+// ---------------------------------------------------------------------------
+// Dater à la main : déplacer des photos dans le dossier d'un mois
+// ---------------------------------------------------------------------------
+
+/// `groups` : pour chaque élément, ses fichiers (photo, RAW, petite vidéo). Renvoie (ancien, nouveau chemin).
+#[tauri::command]
+async fn date_items(app: AppHandle, groups: Vec<Vec<String>>, month: String) -> Result<Vec<(String, String)>, String> {
+    let s = app.state::<AppState>().settings.lock().unwrap().clone();
+    if s.library.is_empty() {
+        return Err("Choisis d'abord le dossier de ta photothèque.".into());
+    }
+    let dest = dating::month_dir(Path::new(&s.library), &month).ok_or("Mois invalide.")?;
+    blocking(move || {
+        let mut moved = Vec::new();
+        let mut err = None;
+        for g in &groups {
+            match dating::move_group(g, &dest) {
+                Ok(m) => moved.extend(m),
+                Err(e) => {
+                    err = Some(e);
+                    break;
+                }
+            }
+        }
+        // une photo secrète le reste à son nouvel emplacement
+        let state = app.state::<AppState>();
+        let mut changed = false;
+        {
+            let mut l = state.lock.lock().unwrap();
+            for (from, to) in &moved {
+                if l.items.remove(&lock::path_id(from)) {
+                    l.items.insert(lock::path_id(to));
+                    changed = true;
+                }
+            }
+        }
+        if changed {
+            save_lock(&state);
+        }
+        match err {
+            Some(e) if moved.is_empty() => Err(e),
+            _ => Ok(moved),
+        }
+    })
+    .await?
+}
+
 fn dir_size(dir: &Path) -> u64 {
     let mut files = Vec::new();
     library::walk_files(dir, &mut files);
@@ -534,6 +739,7 @@ fn main() {
                 lock: Mutex::new(lock_store),
                 locked_items: Mutex::new(Vec::new()),
                 revealed: AtomicBool::new(false),
+                import_plan: Mutex::new(None),
             });
             Ok(())
         })
@@ -560,6 +766,13 @@ fn main() {
             unlock_items,
             private_image,
             albums_get,
+            import_info,
+            import_analyze,
+            import_apply,
+            open_folder,
+            explore_scan,
+            explore_copy,
+            date_items,
             albums_set,
             cache_size,
             clear_cache,

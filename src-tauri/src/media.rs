@@ -1,9 +1,7 @@
 //! Miniatures, aperçus (RAW, TIFF) et informations d'une photo.
 
 use image::{DynamicImage, ImageFormat};
-use std::collections::hash_map::DefaultHasher;
 use std::fs;
-use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -26,12 +24,7 @@ fn cache_name(src: &Path, max: u32) -> String {
             (m.len(), t)
         })
         .unwrap_or((0, 0));
-    let mut h = DefaultHasher::new();
-    src.to_string_lossy().hash(&mut h);
-    size.hash(&mut h);
-    mtime.hash(&mut h);
-    max.hash(&mut h);
-    format!("{:016x}.jpg", h.finish())
+    util::cache_key(&src.to_string_lossy(), size, mtime, max)
 }
 
 fn read_exif(src: &Path) -> Option<exif::Exif> {

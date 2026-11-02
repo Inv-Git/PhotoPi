@@ -1,6 +1,6 @@
 [package]
 name = "photopi"
-version = "1.0.0"
+version = "1.1.0"
 description = "Visionneuse de photothèque"
 edition = "2021"
 

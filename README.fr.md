@@ -29,6 +29,10 @@ PhotoPi est le petit frère de [MusicPi](https://github.com/Inv-Git/MusicPi) : t
 - Informations de prise de vue : date, appareil, objectif, réglages, GPS
 
 **Organisation**
+- Import intégré : dépose tes photos, vidéos ou archives Google Takeout en vrac dans un dossier d'arrivée, PhotoPi les range par mois en écartant les doublons (aperçu avant rangement)
+- Import depuis un autre dossier ou disque : seules les photos absentes de la photothèque sont copiées, la source n'est jamais modifiée
+- Explorer un dossier ou un disque entier en lecture seule, et cocher des images pour les ajouter à la photothèque
+- Dater à la main les photos sans date (« À trier ») : elles sont déplacées dans le dossier du mois choisi
 - Sélection multiple (cases, Ctrl + clic, Maj + clic, Ctrl + A)
 - Albums thématiques : une photo peut être dans plusieurs albums, les fichiers ne bougent pas
 - Photos secrètes : masquées dans PhotoPi derrière un mot de passe (les fichiers ne sont ni modifiés ni chiffrés)

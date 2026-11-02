@@ -31,6 +31,10 @@ The interface is in French for now.
 - Shooting info: date, camera, lens, settings, GPS
 
 **Organising**
+- Built-in import: drop photos, videos or Google Takeout archives into an inbox folder, PhotoPi sorts them by month and sets duplicates aside (preview before anything moves)
+- Import from another folder or drive: only photos missing from the library are copied, the source is never changed
+- Browse any folder or whole drive read-only, and tick images to add them to the library
+- Date undated photos by hand ("À trier"): they are moved into the chosen month's folder
 - Multi-selection (check boxes, Ctrl + click, Shift + click, Ctrl + A)
 - Thematic albums: a photo can be in several albums, files never move
 - Secret photos: hidden in PhotoPi behind a password (files are neither changed nor encrypted)
